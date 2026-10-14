@@ -1,0 +1,30 @@
+import numpy as np
+from scipy.stats import norm
+from scipy.optimize import minimize_scalar
+
+phi0 = norm.pdf(0)   # φ(0) = 1/sqrt(2π)
+
+def a(x0):
+    if x0 < 0:
+        return 0.0
+    return (phi0 - norm.pdf(x0)) / norm.cdf(x0)
+
+def b(x0):
+    if x0 < 0:
+        return phi0 / (1 - norm.cdf(x0))
+    return norm.pdf(x0) / (1 - norm.cdf(x0))
+
+def mse(x0):
+    p = norm.cdf(x0)
+    return 1.5 - (p * a(x0)**2 + (1 - p) * b(x0)**2)
+# 1)Few split points
+for x0 in [-1, -0.5, 0, 0.25, 0.3, 0.5, 0.7, 1, 1.5]:
+    print(f"x0 = {x0:5.2f}   MSE = {mse(x0):.4f}")
+
+# 2)Optimiser find the best x0
+res = minimize_scalar(mse, bounds=(-3, 3), method="bounded")
+x_best = res.x
+print("\nbest x0 :", x_best)
+print("a       :", a(x_best))
+print("b       :", b(x_best))
+print("MSE     :", res.fun)
