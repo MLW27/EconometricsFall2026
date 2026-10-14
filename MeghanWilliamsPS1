@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm
 from scipy.optimize import minimize_scalar
 
-phi0 = norm.pdf(0)   # φ(0) = 1/sqrt(2π)
+phi0 = norm.pdf(0)
 
 def a(x0):
     if x0 < 0:
@@ -17,7 +17,7 @@ def b(x0):
 def mse(x0):
     p = norm.cdf(x0)
     return 1.5 - (p * a(x0)**2 + (1 - p) * b(x0)**2)
-# 1)Few split points
+# 1)split points to look at
 for x0 in [-1, -0.5, 0, 0.25, 0.3, 0.5, 0.7, 1, 1.5]:
     print(f"x0 = {x0:5.2f}   MSE = {mse(x0):.4f}")
 
