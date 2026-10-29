@@ -1,0 +1,99 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import seaborn as sns
+import statsmodels.formula.api as smf
+from scipy import stats
+
+data = pd.read_csv("ps1small.csv")
+data["logwage"] = np.log(data["wage"])
+data
+
+data['combined_dummies'] = 'd' +data['age'].astype(str)+data['education'].astype(str)
+data
+data.count()
+
+unrestricted_model= smf.ols('logwage ~ 0+ C(combined_dummies)', data=data).fit()
+print(unrestricted_model.summary())
+
+restricted_model = smf.ols('logwage ~ age * education', data=data).fit()
+print(restricted_model.summary())
+
+print(sm.stats.anova_lm(restricted_model,unrestricted_model))
+
+param_names = list(unrestricted_model.params.index)
+print(param_names)
+
+#Creating R
+cells = sorted(data['combined_dummies'].unique())
+age = np.array([int(c[1:3]) for c in cells])
+edu = np.array([int(c[3:5]) for c in cells])
+
+# 30 x 4 matrix: one row per cell, columns are 1, education, age, education*age
+Z = np.column_stack([np.ones(30),edu ,age ,edu*age ])
+
+# anchors: four corners of a rectangle,
+anchor_cells = [(12, 26), (12, 27), (13, 26), (13, 27)]
+anchor_idx = [cells.index(f'd{a}{e}') for e, a in anchor_cells]
+
+Z_anchor = Z[anchor_idx, :]                       # 4 x 4
+Z_anchor_inv = np.linalg.inv(Z_anchor)
+
+rows = []
+for c in range(30):
+    if c in anchor_idx:
+        continue
+    r = np.zeros(30)
+    r[c] = -1                            
+    r[anchor_idx] = Z[c,:] @ Z_anchor_inv             
+    rows.append(r)
+
+R = np.array(rows)
+q = np.zeros((26,1))
+
+print(Z_anchor)
+print(Z_anchor_inv)
+print(R.shape)                           
+print(np.abs(R @ Z).max())              
+print(np.linalg.matrix_rank(R))             
+print(R)
+
+# the 30 coefficients
+alpha_hat = unrestricted_model.params.values
+
+# estimated covariance matrix of alpha_hat
+V = unrestricted_model.cov_params().values
+q = np.zeros(26)
+# how far the data are from satisfying the restrictions: R alpha_hat - q
+gap = R @ alpha_hat - q
+
+# the variance under null
+middle = R @ V @ R.T
+
+# F
+F = gap @ np.linalg.inv(middle) @ gap / 26
+
+p_value = stats.f.sf(F,26, 868)     # numerator df, denominator df
+
+print(F, p_value)
+
+
+data1=pd.read_excel('wage.xlsx')
+data1['lw']=np.log(data1.wage)
+y1=data1.lw[data1.male==0].values; y2=data1.lw[data1.male==1].values   # 1 = female, 2 = male
+n1,n2=len(y1),len(y2)
+s1,s2=y1.var(ddof=1),y2.var(ddof=1)
+T=np.sqrt(n1*n2/(n1+n2))*(np.log(s1)-np.log(s2))
+num=sum(((y-y.mean())**4).sum() for y in (y1,y2))
+den=sum(((y-y.mean())**2).sum() for y in (y1,y2))
+kh=(n1+n2)*num/den**2
+z=T/np.sqrt(kh-1)
+F=s1/s2
+
+labels = ["n1", "n2", "s1", "s2", "T", "kh", "z", "1-cdf", "ppf"]
+values = [n1, n2, s1, s2, T, kh, z, 1 - stats.norm.cdf(z), stats.norm.ppf(.95)]
+
+for label, val in zip(labels, values):
+    print(f"{label}: {val}")
+print(F,stats.f.ppf(.95,n1-1,n2-1),1-stats.f.cdf(F,n1-1,n2-1), T/np.sqrt(2),1-stats.norm.cdf(T/np.sqrt(2)))
